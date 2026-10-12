@@ -13,14 +13,12 @@
   （容器已经有 screen_margin 的 padding），这里只留卡片之间的竖直间距。
   多写一层水平边距就是「每行对不齐」的另一半来源。
 -->
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+            style="@style/Widget.AudioStream.Card" xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="@dimen/card_gap"
-    app:cardCornerRadius="@dimen/card_radius"
-    app:cardElevation="0dp"
-    app:strokeWidth="0dp">
+    android:layout_marginTop="@dimen/card_gap">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -85,25 +83,26 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/gap_tiny"
+            android:gravity="end"
             android:orientation="horizontal">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/routeToggle"
-                style="@style/Widget.Material3.Button.TextButton"
+                style="@style/Widget.AudioStream.RowButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="停止" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/routeEdit"
-                style="@style/Widget.Material3.Button.TextButton"
+                style="@style/Widget.AudioStream.RowButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="编辑" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/routeDelete"
-                style="@style/Widget.Material3.Button.TextButton"
+                style="@style/Widget.AudioStream.RowButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="删除" />

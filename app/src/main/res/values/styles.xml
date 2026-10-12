@@ -24,13 +24,22 @@
 
     <!--
       卡片。全应用一套圆角与留白，布局里不再各写各的。
-      strokeWidth 0 与 cardElevation 0：这个界面靠留白和圆角分组，不靠阴影与描边——
-      阴影在深色主题下几乎看不见，却会在浅色下把屏幕压得很脏。
+
+      边界用「容器色背景 + 一圈细描边」两样一起给，原因是单靠任何一样都不够：
+      - 只靠背景色调差：Material 3 的 colorSurface 与容器色在实际屏幕上差别很小，
+        用户明确反馈过「看不出每个播放源的边界」；
+      - 只靠阴影：深色主题下阴影几乎不可见。
+      描边是浅色与深色下都可靠的边界，背景色让它更早被看出来。
+      描边色用 colorOutline 而不是 colorOutlineVariant：后者在深色主题下与容器底的差别
+      小到几乎看不出来——这是把布局渲染成 PNG 之后当场看出来的，光读代码不会发现。
+      （早先这里把 strokeWidth 与 cardElevation 都设成 0，是「为了干净」砍过了头。）
     -->
     <style name="Widget.AudioStream.Card" parent="Widget.Material3.CardView.Elevated">
         <item name="cardCornerRadius">@dimen/card_radius</item>
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainerHighest</item>
         <item name="cardElevation">0dp</item>
-        <item name="strokeWidth">0dp</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="strokeColor">?attr/colorOutline</item>
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
     </style>
@@ -70,6 +79,20 @@
 
     <style name="Widget.AudioStream.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+    </style>
+
+    <!--
+      卡片里那排操作按钮（停止/编辑/删除）。
+      inset 全设 0 的理由与整宽按钮一样：Material 按钮自带一圈 inset，
+      右对齐之后最右边那个会离卡片右边缘差几个像素，看起来就是「没对齐」。
+    -->
+    <style name="Widget.AudioStream.RowButton" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:insetLeft">0dp</item>
         <item name="android:insetRight">0dp</item>

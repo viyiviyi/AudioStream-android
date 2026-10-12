@@ -21,12 +21,10 @@
         android:paddingEnd="@dimen/screen_margin">
 
         <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.AudioStream.Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/card_gap"
-            app:cardCornerRadius="@dimen/card_radius"
-            app:cardElevation="0dp"
-            app:strokeWidth="0dp">
+            android:layout_marginTop="@dimen/card_gap">
 
             <LinearLayout
                 android:layout_width="match_parent"

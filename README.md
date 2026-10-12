@@ -53,7 +53,11 @@ powershell -File tools\build.ps1 -Version 2.0.0  # 1.2.1 (5) -> 2.0.0 (6)
 - **不要手改 `version.properties`**。Android 只认 `versionCode`；新包的这个值不比机器上已装的那个大，
   系统就以「版本号不比已安装的新」为由拒装——那句提示完全看不出与版本号有关。脚本会同时推进两个值。
 - **用 `-Version` 指定版本名时，`versionCode` 仍然 +1**，就是为了上面这条：版本名可以往回退，它不行。
-- **构建失败会回滚版本号**。号用掉了却没有对应的包，下次打包就会跳号，事后没人说得清那个号去哪了。
+- **任何阶段失败都会回滚版本号**，不只是 Gradle 构建失败——收集产物、发布到网络盘也在内。
+  号用掉了却没有对应的包，下次打包就会跳号，事后没人说得清那个号去哪了。
+  这条最早只兜住了 Gradle 阶段，后来实测到一次「构建成功、发布失败」，版本号被吃掉，才改成
+  把整段包进 `try/catch`。用 `try/catch` 而不是 `trap` 也是实测结果：`trap` 在「脚本中途定义、
+  末尾才出错」的情形下没有执行回滚（号被吃掉，且没有任何提示）。
 
 产物落在 `dist\audiostream-android-<版本>-<variant>.apk`，可直接 sideload：
 
@@ -275,6 +279,28 @@ Material 的按钮自带 `insetLeft/Right`、输入框的描边自带内部留�
 
 有一处是翻页时才发现的：各页**页内**都整齐，但基准不同（播放页 96px、共享页 128px），
 所以除了页内断言之外还有一条**跨页**断言，把四个页面放在一起比。
+
+### 界面截图（自查手段）
+
+界面改动**不靠读代码猜观感**——这台开发机的图形栈会成片卡死（`screencap` 超时、
+`uiautomator dump` 抓到的常是 System UI 自己的 ANR 弹窗），所以改成看渲染出来的图：
+
+```powershell
+gradle :app:testDebugUnitTest --tests "*ScreenshotTest*" --rerun-tasks
+# 产物：app\build\screenshots\{light,dark}-{playback,share,settings,log,route-card,shell}.png
+```
+
+`ScreenshotTest` 用 Robolectric 的 NATIVE 图形模式，把每个布局 inflate → measure → layout →
+`view.draw(Canvas)` 到 Bitmap → 写 PNG。这是**改完样式唯一能自己看见结果**的办法：卡片边界在
+深色下够不够清楚、右对齐有没有真的贴到边，都是看图才发现的（前两轮全靠读代码推理，两次都
+没能主动发现问题，都是用户报上来的）。
+
+两个必须记住的点：
+
+- **一定要带 `--rerun-tasks`**。Gradle 判定任务 up-to-date 时测试根本不跑，而截图文件还留在
+  原地，看文件的修改时间没变才知道手里是旧图——拿着旧图下结论比不看图更糟。
+- 渲染的是**布局的静态状态**，不跑 Fragment 的数据绑定。图里设备下拉是空白的（实际运行时会填
+  上），**别把它当成缺陷去修**。
 
 ### 多路播放
 

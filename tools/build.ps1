@@ -135,6 +135,16 @@ if ($bumped) {
   Write-Host ("  保持 {0} ({1})" -f $newName, $newCode)
 }
 
+# ---------------- 从这里开始，任何失败都要把版本号退回去 ----------------
+#
+# 只兜住 Gradle 构建是不够的：收集产物、发布到网络盘（X: 是网络盘，离线过一次）
+# 都可能失败，而那些阶段出错时版本号已经写出去了。号用掉了却没有对应的包，
+# 下次打包就会跳号，事后没人说得清那个号去哪了。
+#
+# 用 try/catch 而不是 trap：trap 的作用域规则在这种「脚本中途定义、末尾才出错」的
+# 场景下不可靠——实测过一次发布阶段失败，trap 里的回滚根本没执行，版本号被吃掉了。
+try {
+
 # ---------------- 环境 ----------------
 
 # 环境变量：Gradle 用这套 JDK / SDK；缓存也放在项目里，方便复现和清理
@@ -170,14 +180,9 @@ $assemble = "assemble$($Variant.Substring(0,1).ToUpper() + $Variant.Substring(1)
 $tasks += ":app:$assemble"
 
 & $gradle -p $root --no-daemon --console=plain @tasks
-$buildFailed = ($LASTEXITCODE -ne 0)
-
-if ($buildFailed -and $bumped) {
-  # 回滚：号用掉了却没有对应的包，下次会跳号，事后没人说得清那个号去哪了
-  Write-AppVersion $versionFile $current.Code $current.Name
-  Write-Host ("  构建失败，版本号已回滚到 {0} ({1})" -f $current.Name, $current.Code)
-}
-if ($buildFailed) { throw "Gradle 构建失败（$($tasks -join ' ')）" }
+# 版本号的回滚不在这里做——上面那个 trap 覆盖了「从写出版本号到脚本结束」的全过程，
+# 包括 Gradle 之后的收集产物与发布。这里只负责把失败抛出去。
+if ($LASTEXITCODE -ne 0) { throw "Gradle 构建失败（$($tasks -join ' ')）" }
 
 # ---------------- 产物 ----------------
 
@@ -224,4 +229,12 @@ Write-Host '== 5/5 完成 =='
 Write-Host "版本：$newName (versionCode $newCode)"
 Write-Host '安装到手机（先在手机上打开 USB 调试）：'
 Write-Host "  $env:ANDROID_HOME\platform-tools\adb.exe install -r `"$out`""
-exit 0
+
+} catch {
+  # 只有真的推进过版本号才需要退回去（-Bump none 时本来就没动过那个文件）
+  if ($bumped) {
+    Write-AppVersion $versionFile $current.Code $current.Name
+    Write-Host ("  构建失败，版本号已回滚到 {0} ({1})" -f $current.Name, $current.Code)
+  }
+  throw
+}
