@@ -16,22 +16,49 @@ PC 端（`AudioStream.exe`，.NET Framework 4.7.2）的手机端。做两件事�
 ```powershell
 cd android
 powershell -File tools\setup-toolchain.ps1     # 建 tools-cache 目录联接 + 生成 local.properties
-powershell -File tools\build.ps1               # release（自签名）APK + 100 项单元测试
+powershell -File tools\build.ps1               # release（自签名）APK + 143 项单元测试，版本 patch+1
+powershell -File tools\build.ps1 -Bump minor
+powershell -File tools\build.ps1 -Bump none    # 反复构建同一个版本（调试时用）
+powershell -File tools\build.ps1 -Version 2.0.0
 powershell -File tools\build.ps1 -Variant debug
 powershell -File tools\build.ps1 -SkipTest     # 只打包
 powershell -File tools\build.ps1 -Install      # 顺手装到唯一在线的那台设备
+powershell -File tools\build.ps1 -Publish      # 顺带拷到 X:\apks
 ```
 
-真机用例（需要一台在线设备，共 6 项）：
+真机用例（需要一台在线设备）：
 
 ```powershell
 gradle :app:connectedDebugAndroidTest
 ```
 
+> 两类真机用例不能混跑：为拉取端建的 `adb reverse tcp:12570` 会占住**设备侧**的 12570，
+> 而来源端用例要在同一个口上起服务，混跑必然 `EADDRINUSE`。分批命令见「联调与自测」。
+
+### 版本号
+
+唯一来源是 `version.properties`（`versionCode` + `versionName`），`app\build.gradle` 只负责读它。
+打包脚本默认把 **patch 与 versionCode 各推进一格**，所以每次打包就是一个新版本，产物名带版本号、
+互不覆盖（同工作区其他工程在 `X:\apks` 下一版留一份，就是这个做法）：
+
+```powershell
+powershell -File tools\build.ps1                 # 1.2.0 (4) -> 1.2.1 (5)
+powershell -File tools\build.ps1 -Bump minor     # 1.2.1 (5) -> 1.3.0 (6)
+powershell -File tools\build.ps1 -Bump none      # 保持 1.2.1 (5)
+powershell -File tools\build.ps1 -Version 2.0.0  # 1.2.1 (5) -> 2.0.0 (6)
+```
+
+三条不能忘的：
+
+- **不要手改 `version.properties`**。Android 只认 `versionCode`；新包的这个值不比机器上已装的那个大，
+  系统就以「版本号不比已安装的新」为由拒装——那句提示完全看不出与版本号有关。脚本会同时推进两个值。
+- **用 `-Version` 指定版本名时，`versionCode` 仍然 +1**，就是为了上面这条：版本名可以往回退，它不行。
+- **构建失败会回滚版本号**。号用掉了却没有对应的包，下次打包就会跳号，事后没人说得清那个号去哪了。
+
 产物落在 `dist\audiostream-android-<版本>-<variant>.apk`，可直接 sideload：
 
 ```powershell
-tools-cache\android-sdk\platform-tools\adb.exe install -r dist\audiostream-android-1.0.0-release.apk
+tools-cache\android-sdk\platform-tools\adb.exe install -r dist\audiostream-android-1.2.0-release.apk
 ```
 
 工具链靠 `android\tools-cache` 这个**目录联接**指到 `C:\apps\dsh_workspace\pinyin-ime\tools-cache`，
@@ -40,8 +67,8 @@ tools-cache\android-sdk\platform-tools\adb.exe install -r dist\audiostream-andro
 依赖按「进不进 APK」分两类：
 
 - **进 APK 的只有一个**：`com.google.android.material:material`，界面用（卡片、滑块、顶栏、
-  深浅色主题）。release 开了 R8 裁剪与资源压缩，实测包体 **1.7 MB**；不裁的话是 4.4 MB，
-  因为 Material 会带进 appcompat、androidx.core、fragment、recyclerview 一串传递依赖。
+  深浅色主题）。release 开了 R8 裁剪与资源压缩，实测包体约 **2.0 MB**（含 adaptive icon 的各密度图标）；
+  不裁的话是 4.4 MB，因为 Material 会带进 appcompat、androidx.core、fragment、recyclerview 一串传递依赖。
 - **不进 APK 的**：`junit` + `robolectric`（JVM 单元测试）、
   `androidx.test:runner` + `androidx.test.ext:junit` + `androidx.test:rules`（真机用例）。
 
