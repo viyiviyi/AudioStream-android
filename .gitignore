@@ -1,0 +1,26 @@
+# 构建工具链：JDK 17 / Android SDK / Gradle 缓存，共约 3 GB。
+# 由 tools\setup-toolchain.ps1 生成（指向同工作区 pinyin-ime\tools-cache 的目录联接），
+# 随时可以重新拉一份，不该进仓库。
+tools-cache/
+
+# Gradle 与 Android 的构建产物
+.gradle/
+build/
+local.properties
+.kotlin/
+
+# 构建出来的安装包。本工程原先靠仓库根的 .gitignore 挡住 dist/，
+# 而这里是独立仓库，不会继承外面那一份——不写在这里，APK 就会跟着代码一起进库。
+# 发布用的包放在 X:\apks（见 README），那才是分发位置。
+dist/
+*.apk
+
+# 联调工具（tools\pc-like-pull）在宿主机上编译出来的类文件
+out/
+*.class
+
+# 编辑器与操作系统
+.idea/
+*.iml
+.DS_Store
+Thumbs.db

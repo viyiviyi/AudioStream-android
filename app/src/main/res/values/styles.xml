@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      底部页签：纯文字，没有图标。
+
+      不用 Material 的 BottomNavigationView，是因为它的条目本来就按「图标 + 文字」排布，
+      把图标藏起来只会留出一块空白位、高度也对不上。这里要的就是四个等宽的文字，
+      自己用 LinearLayout 排最直接，选中态靠颜色与字重区分。
+    -->
+    <!-- parent="" 是必须的：名字里带点的话，AAPT 会把「点号前面那一段」当成隐式父样式
+         （这里就是 Widget.AudioStream），而它并不存在，构建期会直接报 resource not found。 -->
+    <style name="Widget.AudioStream.BottomTab" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">@color/bottom_tab_text</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+    </style>
+
+    <!--
+      卡片。全应用一套圆角与留白，布局里不再各写各的。
+      strokeWidth 0 与 cardElevation 0：这个界面靠留白和圆角分组，不靠阴影与描边——
+      阴影在深色主题下几乎看不见，却会在浅色下把屏幕压得很脏。
+    -->
+    <style name="Widget.AudioStream.Card" parent="Widget.Material3.CardView.Elevated">
+        <item name="cardCornerRadius">@dimen/card_radius</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeWidth">0dp</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+    </style>
+
+    <!--
+      卡片里的一行内容。外边距只在竖直方向留，水平一律 0——
+      水平方向的缩进由卡片自己的 padding 统一给，行再各自缩进就会参差不齐。
+    -->
+    <style name="Widget.AudioStream.CardContent" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">0dp</item>
+        <item name="android:layout_marginEnd">0dp</item>
+    </style>
+
+    <!--
+      整宽按钮。inset 全设 0 是必须的：Material 按钮默认自带一圈 inset，
+      于是按钮的左边缘会比同卡片里的输入框、下拉框往右缩一截，看起来就是「没对齐」。
+    -->
+    <style name="Widget.AudioStream.Button" parent="Widget.Material3.Button">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+    </style>
+
+    <style name="Widget.AudioStream.Button.Tonal" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+    </style>
+
+    <style name="Widget.AudioStream.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:insetLeft">0dp</item>
+        <item name="android:insetRight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+    </style>
+
+</resources>

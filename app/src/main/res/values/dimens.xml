@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      全应用统一的尺寸。界面之前不整齐的根源不是「随手写错了一个数」，而是同一个概念
+      在不同的布局文件里各写了一个值：屏幕边距有的 12dp 有的 16dp，卡片间距有的 4dp
+      有的 12dp，卡片外的小标题还额外缩进 4dp，于是每一行的左边缘都不一样。
+
+      从这里开始，边距只用这几个名字，布局里不再出现字面量。
+
+      「整齐」在这套名字下的确切含义：页容器留 screen_margin、卡片内留 card_padding，
+      **卡片外的文字也补一个 screen_margin 的起始边距**——于是所有正文文字的左边缘
+      都落在 16+16=32dp 这一条线上。改这些值之前先想清楚它对那条线的影响。
+    -->
+
+    <!-- 屏幕左右边距。所有页的最外层容器都用它。 -->
+    <dimen name="screen_margin">16dp</dimen>
+
+    <!-- 卡片内部四周的留白。所有卡片都用它。 -->
+    <dimen name="card_padding">16dp</dimen>
+
+    <!-- 卡片与卡片（或卡片与区块标题）之间的竖直距离。 -->
+    <dimen name="card_gap">12dp</dimen>
+
+    <!-- 卡片圆角。 -->
+    <dimen name="card_radius">16dp</dimen>
+
+    <!--
+      挂在页面上（而不是卡片里）的文字，要留多大的起始边距，才能和卡片里的文字左边缘对齐。
+
+      这个值不是设计稿上抄的，是量出来的：卡片内的文字左边缘实测在 128px（xhdpi），
+      而卡片外的文字用 screen_margin 时为 96px，差 32px —— 也就是这里要补的量。
+      改动屏幕边距或卡片内边距之后，LayoutAlignmentTest 会告诉你这个值还对不对。
+    -->
+    <dimen name="text_indent">32dp</dimen>
+
+    <!-- 底部页签的高度。 -->
+    <dimen name="bottom_tab_height">56dp</dimen>
+
+    <!-- 同一张卡片里紧挨着的两行之间的距离（标题与它的说明、状态的两行）。 -->
+    <dimen name="gap_tiny">4dp</dimen>
+
+    <!-- 同一张卡片里相邻控件之间的距离（输入框与按钮、按钮与按钮）。 -->
+    <dimen name="gap_small">8dp</dimen>
+
+    <!-- 区块标题与它上方内容之间的距离（说明它属于下一块，而不是上一块的尾巴）。 -->
+    <dimen name="gap_large">20dp</dimen>
+
+</resources>

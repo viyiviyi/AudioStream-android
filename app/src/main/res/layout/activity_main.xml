@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  主界面只剩一个壳子：顶栏、内容区、底部四个页签。
+
+  拆页之前是一屏塞下四件事（播放、共享、外观、日志），用卡片分组。分组能解决「看不出归属」，
+  解决不了「一屏东西太多」——用户打开应用只想听电脑的声音，却要先划过一堆他不关心的开关。
+  现在每页只管一件事，不想看的东西不用看见。
+
+  内容区用 FrameLayout 而不是 FragmentContainerView：页签是手工 transaction 切换的，
+  没有用 Navigation 组件，FrameLayout 的语义更直接。
+
+  底部页签是四个纯文字，没有图标。不用 Material 的 BottomNavigationView 的原因写在
+  styles.xml 里：它的条目本来就按「图标 + 文字」排布，藏掉图标会留出空白位、高度也对不上。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        app:title="@string/app_name"
+        app:titleCentered="false" />
+
+    <FrameLayout
+        android:id="@+id/fragmentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- 一条细线把内容与导航分开。用它而不是给导航加阴影：阴影在深色主题下几乎看不见，
+         在浅色下又会把屏幕压脏，而这条线两种主题下都清楚。 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?attr/colorOutlineVariant" />
+
+    <LinearLayout
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/bottom_tab_height"
+        android:background="?attr/colorSurface"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tabPlayback"
+            style="@style/Widget.AudioStream.BottomTab"
+            android:text="播放" />
+
+        <TextView
+            android:id="@+id/tabShare"
+            style="@style/Widget.AudioStream.BottomTab"
+            android:text="共享" />
+
+        <TextView
+            android:id="@+id/tabSettings"
+            style="@style/Widget.AudioStream.BottomTab"
+            android:text="设置" />
+
+        <TextView
+            android:id="@+id/tabLog"
+            style="@style/Widget.AudioStream.BottomTab"
+            android:text="日志" />
+    </LinearLayout>
+</LinearLayout>

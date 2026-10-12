@@ -1,0 +1,12 @@
+﻿# 换行符统一：不统一的话，Windows 上的编辑器与构建脚本会各自轮换行符，
+# 同一个人改一行、diff 里整个文件都在变，审查时看不出真正改了什么。
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# 二进制：绝不能被当文本转换
+*.png binary
+*.ico binary
+*.apk binary
+*.jar binary
+*.keystore binary
