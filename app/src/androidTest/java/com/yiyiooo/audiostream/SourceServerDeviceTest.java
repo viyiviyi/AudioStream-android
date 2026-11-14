@@ -18,6 +18,7 @@ import com.yiyiooo.audiostream.pull.PullState;
 import com.yiyiooo.audiostream.source.DeviceSourceProvider;
 import com.yiyiooo.audiostream.source.SourceServer;
 
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -56,6 +57,37 @@ public class SourceServerDeviceTest {
 
     private static final String MACHINE_ID = "ffffffffffffffffffffffffffffffff";
     private static final String PULLER_ID = "11111111111111111111111111111111";
+
+    /**
+     * 再兜一次录音权限。
+     *
+     * {@link GrantPermissionRule} 走的是 UiAutomation 的授权接口，而 MIUI 这类系统会把它
+     * **静默拦下**：不报错，权限就是没授上。后果是后面点单被协议层以 denied 拒绝，
+     * 现场表现成「连上了但收不到音频、状态还停在 IDLE」，与来源端本身毫无关系——
+     * 在 Redmi K20 Pro（Android 11 / MIUI）上就是这样栽过一次。
+     *
+     * 这里改用 instrumentation 自带的 shell 权限直接下发 pm grant：系统对「shell 下发的授权」
+     * 不做那种拦截。仍然授不上时，把要手工执行的命令写进断言消息，别让人对着现象猜。
+     */
+    @Before
+    public void ensureRecordPermission() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                != PackageManager.PERMISSION_GRANTED) {
+            try {
+                InstrumentationRegistry.getInstrumentation().getUiAutomation()
+                        .executeShellCommand("pm grant " + context.getPackageName()
+                                + " " + Manifest.permission.RECORD_AUDIO).close();
+            } catch (Exception e) {
+                System.out.println("[权限] shell 授权失败：" + e);
+            }
+        }
+        assertTrue("这台设备上没能拿到录音权限，来源端点单必然被拒。可手动执行后重跑：\n"
+                        + "  adb shell pm grant " + context.getPackageName()
+                        + " " + Manifest.permission.RECORD_AUDIO,
+                context.checkSelfPermission(Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED);
+    }
 
     /** 拉多久。够看清「一直在来」即可，不必长到让一次联调变成几分钟。 */
     private static final int PULL_SECONDS = 5;

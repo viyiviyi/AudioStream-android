@@ -124,8 +124,8 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
         }
 
         int frameSize = fmt.blockAlign();
-        // 每次取 20ms，取整到帧。太碎会让 write 调用过密，太整又会把缓冲抽干
-        int chunk = Math.max(frameSize, (int) (fmt.bytesPerSecond() * 20L / 1000L));
+        // 一块写 60 毫秒（见 PlaybackTuning.CHUNK_MS）：唤醒次数由每秒 50 次降到约 17 次，延迟不变
+        int chunk = Math.max(frameSize, (int) (fmt.bytesPerSecond() * PlaybackTuning.CHUNK_MS / 1000L));
         chunk = (chunk / frameSize) * frameSize;
         byte[] block = new byte[chunk];
         byte[] lastFrame = new byte[frameSize];
@@ -135,7 +135,9 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
             if (!started) {
                 // 起播门槛：攒到目标水位的一半再开声，避免一开声就是一段欠载
                 if (ring.availableMs(fmt.bytesPerSecond()) < PlaybackTuning.TARGET_BUFFER_MS * PlaybackTuning.START_GATE_RATIO) {
-                    sleep(PlaybackTuning.SHORT_WAIT_MS);
+                    // 等数据，而不是隔几毫秒醒一次看有没有：对端还没出声时这里可能是长时间空等，
+                    // 轮询会让写线程每秒空醒两百次
+                    ring.awaitData(PlaybackTuning.SHORT_WAIT_MS);
                     continue;
                 }
                 out.play();
@@ -146,7 +148,7 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
             int want = Math.min(block.length, ring.capacity());
             want = (want / frameSize) * frameSize;
             if (want <= 0) {
-                sleep(PlaybackTuning.SHORT_WAIT_MS);
+                ring.awaitData(PlaybackTuning.SHORT_WAIT_MS);
                 continue;
             }
 
@@ -156,7 +158,7 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
                 int n = ring.read(block, got, want - got);
                 if (n <= 0) {
                     if (waited) break; // 短等过了还是没有，别在这里卡死
-                    sleep(PlaybackTuning.SHORT_WAIT_MS);
+                    ring.awaitData(PlaybackTuning.SHORT_WAIT_MS);
                     waited = true;
                     continue;
                 }
@@ -171,7 +173,7 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
             if (got < want) {
                 if (!hasLastFrame) {
                     // 一段音频都还没收到过，没有可重复的东西，只能接着等
-                    sleep(PlaybackTuning.SHORT_WAIT_MS);
+                    ring.awaitData(PlaybackTuning.SHORT_WAIT_MS);
                     continue;
                 }
                 // 欠载：把剩下的用上一帧填满。补静音在听感上是一段空白，重复上一帧几乎听不出来；
@@ -262,6 +264,17 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
         return writtenBytes;
     }
 
+    /**
+     * 写线程进过多少次等待。
+     *
+     * 给测试看「没数据时是不是在忙等」：音频播放的 CPU 占用本来就分不出差别，
+     * 而每秒醒多少次能直接看出来，也就是耗电的量化依据。
+     */
+    long awaitCalls() {
+        RingBuffer ring = buffer;
+        return ring == null ? 0 : ring.awaitCalls();
+    }
+
     public boolean isPlaying() {
         return running && started;
     }
@@ -279,6 +292,9 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
     @Override
     public void close() {
         running = false;
+        // 先让等在缓冲上的写线程醒来：只置标志而不唤醒，它要等满一个等待周期才发现 running 变了
+        RingBuffer ring = buffer;
+        if (ring != null) ring.close();
         Thread thread = writer;
         if (thread != null) thread.interrupt();
         releaseSink();

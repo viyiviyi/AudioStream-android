@@ -30,6 +30,14 @@ public final class PlaybackTuning {
      */
     public static final int SINK_BUFFER_MS = 60;
 
-    /** 缓冲不足时先短等一下的时长（毫秒）。等不到才补帧，这样偶发抖动不会变成可听见的处理。 */
-    public static final int SHORT_WAIT_MS = 5;
+    /** 缓冲不足时等数据的上限（毫秒）。有数据时等待会立即返回，所以这个值只决定「完全没数据」时多久看一次。 */
+    public static final int SHORT_WAIT_MS = 20;
+
+    /**
+     * 每次往声卡写多少毫秒。与 {@link #SINK_BUFFER_MS} 同量级。
+     *
+     * 块的边界由声卡缓冲的阻塞写决定：写得太碎（比如 20 毫秒）只会让写线程醒得更勤，
+     * 每秒 50 次变成约 17 次，而端到端延迟不变——延迟由缓冲水位决定，不由每块多大决定。
+     */
+    public static final int CHUNK_MS = 60;
 }

@@ -165,6 +165,30 @@ public class PlaybackSessionTest {
         session.close();
     }
 
+    /**
+     * 没有音频数据时不能忙等。
+     *
+     * 这是真实用户场景：连上了对端、对端却没在出声（电脑静音、电脑没在放、设备静默）。
+     * 早先写线程在这种情况只能每 5 毫秒醒一次看有没有数据，一秒空醒两百次，放着不动也掉电。
+     * 现在会睡在缓冲上，等待上限是 20 毫秒。
+     */
+    @Test
+    public void 没有音频数据时不会忙等() {
+        FakeFactory factory = new FakeFactory();
+        PlaybackSession session = new PlaybackSession(factory, new Recorder());
+        session.onFormat(FORMAT_48K_16_2);
+        session.onState(PullState.PLAYING, "正在播放");
+
+        // 一帧数据都不给，让写线程空转 400 毫秒
+        sleep(400);
+        long awaits = session.awaitCalls();
+        // 400 毫秒 / 20 毫秒上限 = 20 次，留一倍余量。
+        // 若有人把等待改回 5 毫秒轮询，这里会到 80 次附近，测试会挂。
+        assertTrue("没有数据时等待了 " + awaits + " 次（400ms 内），说明在忙等", awaits <= 40);
+        assertTrue("至少应当等过几次（0 次说明根本没进入等待）", awaits > 0);
+        session.close();
+    }
+
     @Test
     public void 欠载时重复上一帧而不是补静音() {
         FakeFactory factory = new FakeFactory();

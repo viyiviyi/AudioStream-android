@@ -1,6 +1,7 @@
 package com.yiyiooo.audiostream.player;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
@@ -108,5 +109,54 @@ public class RingBufferTest {
         ring.write(new byte[]{7, 7, 7, 7}, 0, 4);
         assertEquals(4, ring.read(dst, 0, 4));
         assertEquals(7, dst[0]);
+    }
+
+    // ---------- 等待能力：写线程不能靠轮询 ----------
+
+    @Test
+    public void 有数据时等待立即返回() {
+        RingBuffer ring = new RingBuffer(64, 4);
+        ring.write(ramp(4), 0, 4);
+        long started = System.currentTimeMillis();
+        assertTrue(ring.awaitData(1000));
+        long cost = System.currentTimeMillis() - started;
+        assertTrue("有数据时不该真的等：" + cost + "ms", cost < 200);
+    }
+
+    @Test
+    public void 没有数据时等待会超时并返回false() {
+        RingBuffer ring = new RingBuffer(64, 4);
+        long started = System.currentTimeMillis();
+        assertFalse("没数据却返回了有数据", ring.awaitData(60));
+        long cost = System.currentTimeMillis() - started;
+        assertTrue("没等够就返回了：" + cost + "ms", cost >= 40);
+    }
+
+    @Test
+    public void 写入会唤醒等待中的线程() throws Exception {
+        RingBuffer ring = new RingBuffer(64, 4);
+        final boolean[] got = new boolean[1];
+        Thread waiter = new Thread(() -> got[0] = ring.awaitData(2000));
+        waiter.start();
+        Thread.sleep(100);
+        ring.write(ramp(4), 0, 4);
+        waiter.join(1000);
+        assertTrue("写入之后等待者应当被唤醒并拿到数据", got[0]);
+        assertEquals(1, ring.awaitCalls());
+    }
+
+    @Test
+    public void 关闭会立刻唤醒等待者() throws Exception {
+        RingBuffer ring = new RingBuffer(64, 4);
+        final boolean[] got = new boolean[]{true};
+        Thread waiter = new Thread(() -> got[0] = ring.awaitData(5000));
+        waiter.start();
+        Thread.sleep(100);
+        long started = System.currentTimeMillis();
+        ring.close();
+        waiter.join(3000);
+        long cost = System.currentTimeMillis() - started;
+        assertFalse("关掉之后不该再返回有数据", got[0]);
+        assertTrue("关掉应当立刻唤醒，而不是等满超时：" + cost + "ms", cost < 1000);
     }
 }
