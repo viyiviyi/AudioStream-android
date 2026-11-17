@@ -67,8 +67,10 @@ public class AudioTrackConfigTest {
 
     @Test
     public void 声卡缓冲不小于系统下限且按帧取整() {
-        // 48000Hz 16 位立体声 = 192000 B/s，60ms 是 11520 字节
-        assertEquals(11520,
+        // 48000Hz 16 位立体声 = 192000 B/s，35ms 是 6720 字节。
+        // 这个数跟着 PlaybackTuning.SINK_BUFFER_MS 走：它从 60 降到 35 是为了降延迟，
+        // 断言具体字节数而不是直接引用常量，是为了让「调小缓冲」这个动作在测试里留下痕迹。
+        assertEquals(6720,
                 AudioTrackConfig.bufferBytesFor(fmt(48000, 16, 2, AudioEncoding.PCM), 1000));
         // 系统下限更大时听系统的
         assertEquals(20000,
@@ -76,6 +78,21 @@ public class AudioTrackConfigTest {
         // 单声道一帧 2 字节：下限 96001 要抬到 96002
         assertEquals(96002,
                 AudioTrackConfig.bufferBytesFor(fmt(48000, 16, 1, AudioEncoding.PCM), 96001));
+    }
+
+    @Test
+    public void 低延迟请求不取系统下限而是按目标毫秒算() {
+        // 48000Hz 16 位立体声 35ms = 6720 字节。即使系统下限报 80ms（30720 字节），
+        // 这条口径也只给 6720——真机上正是「max(min, wanted)」把它抬成 80ms，降延迟才一直没生效。
+        assertEquals(6720,
+                AudioTrackConfig.bufferBytesFor(fmt(48000, 16, 2, AudioEncoding.PCM)));
+        // 48000Hz 32 位浮点立体声 = 384000 B/s，35ms = 13440 字节，一帧 8 字节整除
+        assertEquals(13440,
+                AudioTrackConfig.bufferBytesFor(fmt(48000, 32, 2, AudioEncoding.IEEE_FLOAT)));
+        // 单声道 16 位：3360 字节本来就能被 2 整除，穷举一个会除不尽的采样率验证取整
+        // 44100Hz 16 位单声道 = 88200 B/s，35ms = 3087 字节，一帧 2 字节 -> 3088
+        assertEquals(3088,
+                AudioTrackConfig.bufferBytesFor(fmt(44100, 16, 1, AudioEncoding.PCM)));
     }
 
     @Test

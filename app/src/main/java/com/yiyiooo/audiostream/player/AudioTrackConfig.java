@@ -75,6 +75,24 @@ public final class AudioTrackConfig {
         return Math.max(size, frame);
     }
 
+    /**
+     * 只按 {@link PlaybackTuning#SINK_BUFFER_MS} 算，**不取系统给的 min**。
+     *
+     * 为什么要这个重载：{@code AudioTrack.getMinBufferSize} 返回的是保守值——实测这台设备
+     * （Redmi K20 Pro / 48k 32 位浮点）给的是 80ms，而我们只想要 35ms。若仍然取 max(min, wanted)，
+     * 请求值会被抬到 80ms，降延迟的改动就完全无效。真机日志里那种
+     * 「请求缓冲 80ms，实际 80ms」就是被 min 抬上去的。
+     *
+     * 风险与兑底：传小于 min 的值在个别设备上会建不起声卡，所以调用方必须先试这条口径，
+     * 失败时回退到 {@link #bufferBytesFor(com.yiyiooo.audiostream.protocol.AudioFormat, int)}。
+     */
+    public static int bufferBytesFor(com.yiyiooo.audiostream.protocol.AudioFormat format) {
+        int wanted = (int) (format.bytesPerSecond() * PlaybackTuning.SINK_BUFFER_MS / 1000L);
+        int frame = format.blockAlign();
+        if (frame > 0) wanted = ((wanted + frame - 1) / frame) * frame;
+        return Math.max(wanted, frame);
+    }
+
     /** 给人看的一句话，出错信息与界面状态都用它。 */
     public static String describe(com.yiyiooo.audiostream.protocol.AudioFormat format) {
         return format.describe();

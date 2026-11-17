@@ -13,10 +13,14 @@ public final class PlaybackTuning {
     }
 
     /**
-     * 抖动缓冲的目标水位（毫秒）。端到端延迟主要由它决定：采集 10 + 水位 35 + 声卡若干。
+     * 抖动缓冲的目标水位（毫秒）。端到端延迟主要由它决定：采集 10 + 水位若干 + 声卡若干。
      * 小于这个水位不起播，避免一开声就是一段欠载。
+     *
+     * 35 → 25：局域网里 35ms 是富余的，而它每多 10ms 就是用户能直接感觉到的一段延迟。
+     * 往下调的风险是网络抖动时更容易欠载，表现为极短的一下重复（不是空白，见 pump 里的补帧）；
+     * 是否够用看欠载计数，不靠感觉。
      */
-    public static final int TARGET_BUFFER_MS = 35;
+    public static final int TARGET_BUFFER_MS = 25;
 
     /** 环形缓冲的容量（毫秒）。它是能扛住多大抖动的上限，不是目标水位。 */
     public static final int CAPACITY_MS = 120;
@@ -25,10 +29,13 @@ public final class PlaybackTuning {
     public static final double START_GATE_RATIO = 0.5;
 
     /**
-     * 声卡缓冲（毫秒）。取 60ms：手机上这个值直接是「按下去到出声」的一部分，
-     * 但比它再小就容易在系统忙时欠载，听起来是周期性的爆音。
+     * 声卡缓冲（毫秒）。这是延迟里最大的一项，比抖动缓冲影响还大。
+     *
+     * 60 → 35：60ms 那一版走的是音乐播放的大缓冲通道，实际分配往往比请求的还大。
+     * 现在同时开了低延迟模式（见 AudioTrackSinkFactory），请求值才有意义。
+     * 再往下压就要看欠载了——太小会变成周期性的爆音，比延迟更让人受不了。
      */
-    public static final int SINK_BUFFER_MS = 60;
+    public static final int SINK_BUFFER_MS = 35;
 
     /** 缓冲不足时等数据的上限（毫秒）。有数据时等待会立即返回，所以这个值只决定「完全没数据」时多久看一次。 */
     public static final int SHORT_WAIT_MS = 20;
@@ -43,6 +50,9 @@ public final class PlaybackTuning {
      *
      * 唤醒次数也不是耗电的主因——每秒 50 次唤醒对手机很轻；真正费电的是「没有数据时按毫秒级轮询」，
      * 那一条由 {@link RingBuffer#awaitAtLeast} 承担，与块大小无关。
+     *
+     * 20 → 10：开低延迟通道后声卡实际缓冲会变小（可能只有十几毫秒），写块比它大就会频繁部分写入，
+     * 而部分写入是要丢数据的（见 pump）。代价是每秒唤醒从 50 次变 100 次，这一项比延迟更值得让。
      */
-    public static final int CHUNK_MS = 20;
+    public static final int CHUNK_MS = 10;
 }

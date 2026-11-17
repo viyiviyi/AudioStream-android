@@ -130,7 +130,9 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
         }
 
         int frameSize = fmt.blockAlign();
-        // 一块写 60 毫秒（见 PlaybackTuning.CHUNK_MS）：唤醒次数由每秒 50 次降到约 17 次，延迟不变
+        // 一块写 PlaybackTuning.CHUNK_MS（10ms）。**必须明显小于声卡缓冲**：声卡缓冲 35ms 时
+        // 10ms 一块留有充分余量；曾经把它调到与缓冲相等（都是 60ms），部分写入被当成「声卡不收」
+        // 而退出了写线程，现场是永久无声（见 PlaybackTuning.CHUNK_MS 的注释）。
         int chunk = Math.max(frameSize, (int) (fmt.bytesPerSecond() * PlaybackTuning.CHUNK_MS / 1000L));
         chunk = (chunk / frameSize) * frameSize;
         byte[] block = new byte[chunk];
