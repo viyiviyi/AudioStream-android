@@ -34,10 +34,15 @@ public final class PlaybackTuning {
     public static final int SHORT_WAIT_MS = 20;
 
     /**
-     * 每次往声卡写多少毫秒。与 {@link #SINK_BUFFER_MS} 同量级。
+     * 每次往声卡写多少毫秒。
      *
-     * 块的边界由声卡缓冲的阻塞写决定：写得太碎（比如 20 毫秒）只会让写线程醒得更勤，
-     * 每秒 50 次变成约 17 次，而端到端延迟不变——延迟由缓冲水位决定，不由每块多大决定。
+     * **必须明显小于 {@link #SINK_BUFFER_MS}，绝不能等于它。** 曾经为了少醒几次把它改成
+     * 60 毫秒（与声卡缓冲一样大），结果真机上播十几秒后永久无声：写 60 毫秒数据进 60 毫秒缓冲时，
+     * AudioTrack.write 会返回部分写入（实测 15424/23040），而当时把「部分写入」当成
+     * 「声卡不再接受」直接退出了写线程。
+     *
+     * 唤醒次数也不是耗电的主因——每秒 50 次唤醒对手机很轻；真正费电的是「没有数据时按毫秒级轮询」，
+     * 那一条由 {@link RingBuffer#awaitAtLeast} 承担，与块大小无关。
      */
-    public static final int CHUNK_MS = 60;
+    public static final int CHUNK_MS = 20;
 }

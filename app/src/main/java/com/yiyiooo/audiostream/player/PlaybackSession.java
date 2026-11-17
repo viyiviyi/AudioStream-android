@@ -49,6 +49,12 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
     private volatile long repeatedBytes;
     private volatile long writtenBytes;
 
+    /**
+     * 声卡只收下一部分的次数。它不为 0 本身不是错（写块接近缓冲容量时很常见），
+     * 但它持续上涨说明写块相对声卡缓冲太大了，该调小 {@link PlaybackTuning#CHUNK_MS}。
+     */
+    private volatile long partialWrites;
+
     public PlaybackSession(AudioSinkFactory sinkFactory, Listener listener) {
         this.sinkFactory = sinkFactory;
         this.listener = listener;
@@ -134,10 +140,12 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
         while (running) {
             if (!started) {
                 // 起播门槛：攒到目标水位的一半再开声，避免一开声就是一段欠载
-                if (ring.availableMs(fmt.bytesPerSecond()) < PlaybackTuning.TARGET_BUFFER_MS * PlaybackTuning.START_GATE_RATIO) {
-                    // 等数据，而不是隔几毫秒醒一次看有没有：对端还没出声时这里可能是长时间空等，
-                    // 轮询会让写线程每秒空醒两百次
-                    ring.awaitData(PlaybackTuning.SHORT_WAIT_MS);
+                int gateBytes = (int) (fmt.bytesPerSecond() * PlaybackTuning.TARGET_BUFFER_MS
+                        * PlaybackTuning.START_GATE_RATIO / 1000L);
+                if (ring.available() < gateBytes) {
+                    // 等到「攒够起播水位」，而不是「有数据就醒」：后者在缓冲里只有 1 毫秒数据时也立刻
+                    // 返回，于是这里的 continue 变成满速空转——省电改动在该生效的地方反而更费电。
+                    ring.awaitAtLeast(gateBytes, PlaybackTuning.SHORT_WAIT_MS);
                     continue;
                 }
                 out.play();
@@ -192,11 +200,20 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
                 // 紧接着循环就会退出，不留痕迹的话现场只剩「就是没声音」。
                 Log.i(TAG, "第一次写声卡：要写 " + got + " 字节，实际写入 " + written);
             }
-            writtenBytes += Math.max(0, written);
-            if (written < got) {
-                // 声卡不收了（正在关，或者写失败），退出
-                Log.w(TAG, "声卡只收下 " + written + "/" + got + " 字节，写线程退出");
+            if (written <= 0) {
+                // 真的写不进去（声卡被关了，或驱动报错），这时才退出
+                Log.w(TAG, "声卡拒收（要写 " + got + " 字节，实际写入 " + written + "），写线程退出");
                 break;
+            }
+            writtenBytes += written;
+            if (written < got) {
+                // **部分写入不是错误。** 写块接近声卡缓冲容量时，AudioTrack.write 返回
+                // 「这次只收下这么多」是常态：上一版把写块设成与缓冲同为 60 毫秒，真机上播十几秒
+                // 就出现一次 15424/23040，而当时这里直接 break，结果写线程永久退出、之后一点声音
+                // 都没有，界面上却还显示在播。丢掉这一块剩下的几十毫秒，继续下一轮。
+                partialWrites++;
+                Log.w(TAG, "声卡只收下 " + written + "/" + got + " 字节，丢掉剩下 "
+                        + (got - written) + " 字节继续写（第 " + partialWrites + " 次部分写入）");
             }
         }
         Log.i(TAG, "写线程结束，累计写入 " + writtenBytes + " 字节");
@@ -262,6 +279,16 @@ public final class PlaybackSession implements PullSession.Listener, Closeable {
 
     public long writtenBytes() {
         return writtenBytes;
+    }
+
+    /**
+     * 声卡只收下一部分的次数。见 {@link #partialWrites} 的说明。
+     *
+     * 公开给测试与诊断用：真机用例把它打日志，单元用例靠它确认「部分写入这条路真的走到了」。
+     * 界面不显示它——对用户没意义。
+     */
+    public long partialWrites() {
+        return partialWrites;
     }
 
     /**

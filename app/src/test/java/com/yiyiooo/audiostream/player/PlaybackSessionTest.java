@@ -85,6 +85,46 @@ public class PlaybackSessionTest {
         }
     }
 
+    /** 每次只收下一半的声卡：模拟写块接近缓冲容量时 AudioTrack 的部分写入。 */
+    private static final class PartialWriteSink implements AudioSink {
+        volatile boolean playing;
+        volatile int writeCalls;
+
+        @Override
+        public int write(byte[] data, int offset, int length) {
+            if (length <= 0) return 0;
+            writeCalls++;
+            return Math.max(1, length / 2);
+        }
+
+        @Override
+        public void play() {
+            playing = true;
+        }
+
+        @Override
+        public void release() {
+        }
+
+        @Override
+        public int bufferSizeBytes() {
+            return 3840;
+        }
+
+        @Override
+        public void setVolume(float value) {
+        }
+    }
+
+    private static final class PartialWriteFactory implements AudioSinkFactory {
+        final PartialWriteSink sink = new PartialWriteSink();
+
+        @Override
+        public AudioSink create(AudioFormat format) {
+            return sink;
+        }
+    }
+
     private static final class Recorder implements PlaybackSession.Listener {
         final List<PullState> states = new ArrayList<>();
         final List<String> failures = new ArrayList<>();
@@ -186,6 +226,41 @@ public class PlaybackSessionTest {
         // 若有人把等待改回 5 毫秒轮询，这里会到 80 次附近，测试会挂。
         assertTrue("没有数据时等待了 " + awaits + " 次（400ms 内），说明在忙等", awaits <= 40);
         assertTrue("至少应当等过几次（0 次说明根本没进入等待）", awaits > 0);
+        session.close();
+    }
+
+    /**
+     * 部分写入不能让写线程退出。
+     *
+     * 这是 1.2.4 的真实事故：写块被设成与声卡缓冲一样大（都是 60 毫秒）时，
+     * AudioTrack.write 偶尔只收下一部分（真机日志 15424/23040），而写线程当时把
+     * 「部分写入」当成「声卡不再接受」直接 break——播十几秒后永久无声，
+     * 界面上却还显示在播。
+     */
+    @Test
+    public void 部分写入不会让写线程退出() {
+        PartialWriteFactory factory = new PartialWriteFactory();
+        PlaybackSession session = new PlaybackSession(factory, new Recorder());
+        session.onFormat(FORMAT_48K_16_2);
+        session.onState(PullState.PLAYING, "正在播放");
+
+        // 持续喂数据。写线程每块只收下一半，缓冲会积压，但只要它还在写就说明没退出。
+        Thread feeder = new Thread(() -> {
+            for (int i = 0; i < 200; i++) {
+                session.onAudio(ramp(5 * BYTES_PER_MS, i), 0, 5 * BYTES_PER_MS);
+                sleep(10);
+            }
+        });
+        feeder.setDaemon(true);
+        feeder.start();
+
+        sleep(500);
+        long first = session.writtenBytes();
+        sleep(400);
+        long second = session.writtenBytes();
+
+        assertTrue("一次部分写入都没发生，用例没验到目标", session.partialWrites() > 0);
+        assertTrue("部分写入之后写线程停了（" + first + " → " + second + "）", second > first);
         session.close();
     }
 

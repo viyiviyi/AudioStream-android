@@ -149,6 +149,35 @@ public final class RingBuffer {
     }
 
     /**
+     * 等到缓冲里至少有 {@code minBytes} 字节，或超时，或环被关掉。
+     *
+     * 与 {@link #awaitData(long)} 的区别：后者「有任意数据」就返回，拿它做「等水位」会在数据不足时
+     * 变成原地空转——有 1 毫秒数据也算「有」，调用方的循环立刻重来，CPU 被打满而水位始终不涨。
+     * 起播门槛那种「等到够量」的场景必须用这一个。
+     *
+     * @return 真的等到够量了为 true；超时或被关掉为 false。
+     */
+    public boolean awaitAtLeast(int minBytes, long timeoutMs) {
+        synchronized (lock) {
+            awaitCalls++;
+            if (size >= minBytes || closed) return size >= minBytes;
+            long budget = Math.max(1L, timeoutMs);
+            long deadline = System.currentTimeMillis() + budget;
+            long left = budget;
+            while (size < minBytes && !closed && left > 0) {
+                try {
+                    lock.wait(left);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+                left = deadline - System.currentTimeMillis();
+            }
+            return size >= minBytes;
+        }
+    }
+
+    /**
      * 唤醒所有等待者，并让之后的 {@link #awaitData} 立刻返回 false。
      * 关掉写线程时必须调它，否则写线程会卡在 wait 里几十毫秒才醒来。
      */

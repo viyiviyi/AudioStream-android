@@ -123,6 +123,19 @@ public class PullPlaybackIntegrationTest {
                 + "　丢弃=" + playback.droppedBytes()
                 + "　缓冲=" + playback.bufferedMs() + "ms");
 
+        // 写线程还活着吗？只断言「累计写入 > 0」是不够的——1.2.4 那次事故里写线程在播了十几秒
+        // 之后就退出了，而累计值早就大于 0，那种断言照样通过。真正的判据是隔一会儿再采一次，
+        // 看它还在不在涨。
+        long beforeIdle = playback.writtenBytes();
+        Thread.sleep(1000);
+        long afterIdle = playback.writtenBytes();
+        Log.i(TAG, "1 秒内写入量：" + beforeIdle + " → " + afterIdle
+                + "（部分写入 " + playback.partialWrites() + " 次）");
+        if (failure.get() == null) {
+            assertTrue("写线程停了：1 秒内写入量没变（" + beforeIdle + " 字节），"
+                    + "播到一半突然没声音就是这个现象", afterIdle > beforeIdle);
+        }
+
         // 先收工，别把连接和声卡留在那儿
         PullSession session = sessionRef.get();
         if (session != null) {
